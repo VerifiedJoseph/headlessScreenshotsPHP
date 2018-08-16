@@ -1,0 +1,7 @@
+{
+    "require": {
+        "league/csv": "9.0",
+        "mikehaertl/php-shellcommand": "^1.4",
+        "league/climate": "^3.4"
+    }
+}
