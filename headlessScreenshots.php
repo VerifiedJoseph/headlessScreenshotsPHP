@@ -3,7 +3,7 @@
 	headlessScreenshots is a PHP command line script for taking screenshots with headless Google chrome.
 
 	Created: August 02, 2018
-	Modifed: August 09, 2018
+	Modifed: August 15, 2018
 */
 
 // Libraries loaded via composer
@@ -30,12 +30,46 @@ $chrome_path = "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe";
 // Array of check results
 $results = array();
 
+// Results Table
+$create_results_table = true;
+
+// Command line options
+$long_options = array(
+	"disable_table", // Disable output table creation
+	"urls:", // Use a custom urls.csv file
+	"results:", // Use a custom results.csv file
+	"screenshots_folder:" // Use a custom screenshots save folder (folder must already exist)
+);
+
+$short_options = ''; 
+
+// Set and get options
+$cli_options = getopt($short_options, $long_options);
+
 try {
 	
 	if (php_sapi_name() != 'cli') {
 		throw new Exception("headlessScreenshots.php must be run via the command line.");
 	}
 
+	// Check for custom urls.csv file
+	if (isset($cli_options['urls']) && $cli_options['urls'] != false) {
+		$climate->out("urls csv file: " . $cli_options['urls']);
+		$csv_file = $cli_options['urls'];
+	}
+	
+	// Check for custom results.csv file
+	if (isset($cli_options['results']) && $cli_options['results'] != false) {
+		$climate->out("results csv file: " . $cli_options['results']);
+		$csv_results_file = $cli_options['results'];
+	}
+	
+	// Check for disable_table option
+	if (isset($cli_options['disable_table'])) {
+		$climate->out("Disabled output table creation");
+		$create_results_table = false;
+	}
+	
 	// Load CSV file
 	$reader = Reader::createFromPath($csv_file, 'r');
 	
@@ -45,21 +79,26 @@ try {
 	// Get Records
 	$records = $reader->getRecords();
 	
-	$climate->out("Screenshotting... " . count($reader) . " websites");
+	$climate->out("Creating " . count($reader) . " screenshots");
 
 	// Loop through each url.
 	foreach ($records as $index => $row) {
 		$result = array();
 		$error_message = "";
 		
-		$url = trim($row['website']);
+		$url = trim($row['url']);
+	
+		if (empty($url)) {
+			$climate->out("No URL given in csv row " . $index);
+			continue;	
+		}
 		
 		// Get domain name from URL
 		if (preg_match('/https?:\/\/([a-zA-Z0-9-.]{2,256}\.[a-z]{2,20}(\:[0-9]{2,4})?)/', $url, $matches)) {
 
 			$output_file = $screenshots_folder . DIRECTORY_SEPARATOR . str_replace(".", "-", $matches[1])  . '.png';
 		
-		} else { // Failed to get domain name, use index number 
+		} else { // Failed to get domain name, use index number
 		
 			$output_file = $screenshots_folder .  DIRECTORY_SEPARATOR . 'image' . $index . '.png';
 			
@@ -68,6 +107,7 @@ try {
 		// Skip website if screenshot already exists
 		if (file_exists($output_file)) {
 			
+			$climate->out("Screenshot already exists: " . $output_file);
 			continue;
 			
 		}
@@ -133,13 +173,16 @@ try {
 		$results[] = $result;
 	}	
 	
-	if (count($results) > 0) {
+	if ($create_results_table === true) {
 	
-		// Output $results as a table.
-		$climate->table($results);
+		if (count($results) > 0) {
 		
-	}
+			// Output $results as a table.
+			$climate->table($results);
+		
+		}
 	
+	}	
 	
 	// Save results to disk.
 	$writer = Writer::createFromPath($csv_results_file, 'w+');
